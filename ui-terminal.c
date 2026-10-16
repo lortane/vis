@@ -301,9 +301,10 @@ vis_ui_window_style_set_pos(Win *win, int x, int y, u16 style_id)
 }
 
 VIS_INTERNAL void
-ui_draw_string(Ui *tui, int x, int y, const char *str, uint16_t style_id)
+ui_draw_string_base(Ui *tui, int x, int y, const char *str, uint16_t base_id, uint16_t style_id)
 {
 	assert(style_id < tui->style_count);
+	assert(base_id < tui->style_count);
 
 	if (x < 0 || x >= tui->width || y < 0 || y >= tui->height)
 		return;
@@ -311,7 +312,7 @@ ui_draw_string(Ui *tui, int x, int y, const char *str, uint16_t style_id)
 
 	/* NOTE: the style that style_id refers to may contain unset values; we need to properly
 	 * clear the cell first then go through ui_window_style_set to get the correct style */
-	VisCellStyle default_style = tui->styles[UI_STYLE_DEFAULT];
+	VisCellStyle default_style = tui->styles[base_id];
 	// FIXME: does not handle double width characters etc, share code with view.c?
 	for (const char *next = str; *str && x < tui->width; str = next) {
 		do next++; while (!ISUTF8(*next));
@@ -329,6 +330,12 @@ ui_draw_string(Ui *tui, int x, int y, const char *str, uint16_t style_id)
 		data->width           = 1;
 		data->file_byte_count = 0;
 	}
+}
+
+VIS_INTERNAL void
+ui_draw_string(Ui *tui, int x, int y, const char *str, uint16_t style_id)
+{
+	ui_draw_string_base(tui, x, y, str, UI_STYLE_DEFAULT, style_id);
 }
 
 VIS_INTERNAL uint8_t
@@ -434,14 +441,17 @@ static void ui_window_draw(Win *win) {
 					}
 				}
 			}
-			VisCellData cd = {.data = {' '}, .data_length = 1, .width = 1};
+			/* share the line number style so the whole gutter has one background */
+			u16 base_id = (l->line_number == cursor_lineno) ? UI_STYLE_LINENUMBER_CURSOR : UI_STYLE_LINENUMBER;
+			VisCellData  cd    = {.data = {' '}, .data_length = 1, .width = 1};
+			VisCellStyle blank = vis_cell_style_merge(ui->styles[UI_STYLE_DEFAULT], ui->styles[base_id]);
 			for (s32 xi = 0; xi < sign_width; xi++) {
 				cells[x + sidebar_width + xi]  = cd;
-				styles[x + sidebar_width + xi] = ui->styles[UI_STYLE_DEFAULT];
+				styles[x + sidebar_width + xi] = blank;
 			}
 			if (sign) {
 				u16 style = sign->style < ui->style_count ? sign->style : UI_STYLE_DEFAULT;
-				ui_draw_string(ui, x + sidebar_width, y, sign->glyph, style);
+				ui_draw_string_base(ui, x + sidebar_width, y, sign->glyph, base_id, style);
 			}
 		}
 		if (l->line_number)
