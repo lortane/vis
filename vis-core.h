@@ -157,6 +157,7 @@ struct File { /* shared state among windows displaying the same file */
 	struct stat stat;                /* filesystem information when loaded/saved, used to detect changes outside the editor */
 	File *next, *prev;
 	SelectionRegionList marks[VIS_MARK_INVALID]; /* marks which are shared across windows */
+	SignList signs;                              /* gutter signs, anchored to text positions */
 };
 
 struct Win {

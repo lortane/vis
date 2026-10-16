@@ -1,3 +1,18 @@
+## [Unreleased]
+
+### Core
+
+- Add an optional gutter sign column, displayed to the left of the line
+  numbers. Signs are anchored to text positions (marks) so they move
+  together with the text as it is edited. The column is only shown while
+  the file has at least one sign.
+
+### Lua API
+
+- `file:sign_set(signs)` and `file:sign_clear()` to manage the gutter signs
+  of a file. Each sign is `{ line = <int>, glyph = <string>, style = <id> }`
+  where the style is obtained from `ui:style_push`.
+
 ## [0.9] - 2024-05-01
 
 This release has been long in the works but its time now. There

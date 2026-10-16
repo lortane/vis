@@ -2,6 +2,10 @@
 #include "vis-core.h"
 #include "text.h"
 
+/* width of the sign column: a single (assumed single cell) glyph plus a
+ * separating space, matching the appearance of other editors */
+enum { UI_SIGN_WIDTH = 2 };
+
 typedef struct {
 	union {
 		struct {u8 r, g, b;} rgb;
@@ -355,14 +359,30 @@ static void ui_window_draw(Win *win) {
 
 	int width = win->width, height = win->height;
 
+	/* Resolve the anchored signs to line numbers once per draw. An invalidated
+	 * mark (e.g. after edits that removed its text) yields line 0 and is skipped.
+	 * The column is always reserved (like a fixed 'signcolumn') so the text
+	 * start does not move when signs appear/disappear. */
+	SignList *signs = &win->file->signs;
+	bool signcolumn = !win->file->internal && !(win->options & UI_OPTION_LARGE_FILE);
+	if (signcolumn) {
+		Text *text = win->file->text;
+		for (VisDACount i = 0; i < signs->count; i++) {
+			size_t pos = text_mark_get(text, signs->data[i].pos);
+			signs->data[i].line = pos == EPOS ? 0 : (u32)text_lineno_by_pos(text, pos);
+		}
+	}
+	int sign_width = signcolumn ? UI_SIGN_WIDTH : 0;
+
 	int sidebar_width = 0;
 	if (sidebar) {
 		sidebar_width = u32_count_digits(view->lastline->line_number) + 1;
 		sidebar_width = MIN(win->width, MAX(sidebar_width, win->min_sidebar_width));
 	}
-	if (sidebar_width != win->sidebar_width) {
-		vis_view_resize(view, width - sidebar_width, status ? height - 1 : height);
-		win->sidebar_width = sidebar_width;
+	int sidebar_offset = sign_width + sidebar_width;
+	if (sidebar_offset != win->sidebar_width) {
+		vis_view_resize(view, width - sidebar_offset, status ? height - 1 : height);
+		win->sidebar_width = sidebar_offset;
 	}
 	vis_window_draw(win);
 
@@ -371,8 +391,8 @@ static void ui_window_draw(Win *win) {
 	int x = win->x, y = win->y;
 	int view_width = view->width;
 	// TODO(rnp): this should not be possible
-	if (x + sidebar_width + view_width > ui->width)
-		view_width = ui->width - x - sidebar_width;
+	if (x + sidebar_offset + view_width > ui->width)
+		view_width = ui->width - x - sidebar_offset;
 
 	// NOTE(rnp) 10 digits in U32_MAX, 1 space, 1 for 0 termination
 	char sidebar_buffer[12];
@@ -403,10 +423,31 @@ static void ui_window_draw(Win *win) {
 				styles[x + xi] = style;
 			}
 			ui_draw_string(ui, x + padding, y, sidebar_buffer, style_id);
-			prev_lineno = l->line_number;
 		}
-		memory_copy(cells  + x + sidebar_width, view->cell_data   + vy * view_width, view_width * sizeof(VisCellData));
-		memory_copy(styles + x + sidebar_width, view->cell_styles + vy * view_width, view_width * sizeof(VisCellStyle));
+		if (sign_width) {
+			Sign *sign = 0;
+			if (l->line_number && l->line_number != prev_lineno) {
+				for (VisDACount i = 0; i < signs->count; i++) {
+					if (signs->data[i].line == l->line_number) {
+						sign = signs->data + i;
+						break;
+					}
+				}
+			}
+			VisCellData cd = {.data = {' '}, .data_length = 1, .width = 1};
+			for (s32 xi = 0; xi < sign_width; xi++) {
+				cells[x + sidebar_width + xi]  = cd;
+				styles[x + sidebar_width + xi] = ui->styles[UI_STYLE_DEFAULT];
+			}
+			if (sign) {
+				u16 style = sign->style < ui->style_count ? sign->style : UI_STYLE_DEFAULT;
+				ui_draw_string(ui, x + sidebar_width, y, sign->glyph, style);
+			}
+		}
+		if (l->line_number)
+			prev_lineno = l->line_number;
+		memory_copy(cells  + x + sidebar_offset, view->cell_data   + vy * view_width, view_width * sizeof(VisCellData));
+		memory_copy(styles + x + sidebar_offset, view->cell_styles + vy * view_width, view_width * sizeof(VisCellStyle));
 		cells  += ui->width;
 		styles += ui->width;
 	}

@@ -24,6 +24,22 @@ typedef struct {
 	VisDACount       capacity;
 } SelectionRegionList;
 
+/* A sign shown in the gutter (e.g. a VCS diff marker). The position is stored
+ * as a text Mark so that it moves together with the text as it is edited. */
+typedef struct {
+	Mark pos;      /* anchored text position */
+	u16  style;    /* style id as obtained from vis.ui:style_push */
+	u8   glyph_len;
+	char glyph[8]; /* NUL terminated UTF-8 glyph */
+	u32  line;     /* resolved line number, 0 if invalid, refreshed while drawing */
+} Sign;
+
+typedef struct {
+	Sign      *data;
+	VisDACount count;
+	VisDACount capacity;
+} SignList;
+
 typedef struct {
 	u32 file_byte_count; /* line length in terms of bytes */
 	u32 line_number;     /* line number from start of file */

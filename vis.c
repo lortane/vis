@@ -60,6 +60,7 @@ vis_file_free(Vis *vis, File *file)
 
 		for (u64 i = 0; i < countof(file->marks); i++)
 			da_release(file->marks + i);
+		da_release(&file->signs);
 
 		text_free(file->text);
 		free(file->filepath.data);

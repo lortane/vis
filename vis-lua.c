@@ -2886,6 +2886,76 @@ static int file_line_column_from_offset(lua_State *L) {
 	return 2;
 }
 
+/***
+ * Set the gutter signs displayed for this file.
+ *
+ * Each sign is anchored to the start of the given 1-based line through a text
+ * mark, so it moves together with the text as it is edited. Any previously set
+ * signs are replaced. The style must be a style id as obtained from
+ * @{style_push} (or one of the @{style_ids}).
+ *
+ * The window gutter (left of the line numbers) is only shown while the file
+ * has at least one sign.
+ *
+ * @function sign_set
+ * @tparam table signs array of `{ line = <int>, glyph = <string>, style = <int> }`
+ * @see sign_clear
+ * @usage
+ * local added = vis.ui:style_push("fore:#00dd00,bold")
+ * vis.win.file:sign_set({ { line = 3, glyph = "+", style = added } })
+ */
+static int file_sign_set(lua_State *L) {
+	Vis  *vis  = lua_get_vis(L);
+	File *file = obj_ref_check(L, 1, VIS_LUA_TYPE_FILE);
+	luaL_checktype(L, 2, LUA_TTABLE);
+
+	file->signs.count = 0;
+	size_t count = lua_rawlen(L, 2);
+	for (size_t i = 1; i <= count; i++) {
+		lua_rawgeti(L, 2, i);
+		if (lua_istable(L, -1)) {
+			lua_getfield(L, -1, "line");
+			lua_Integer line = luaL_optinteger(L, -1, 0);
+			lua_pop(L, 1);
+
+			lua_getfield(L, -1, "glyph");
+			size_t glyph_len = 0;
+			const char *glyph = luaL_optlstring(L, -1, "", &glyph_len);
+			lua_pop(L, 1);
+
+			lua_getfield(L, -1, "style");
+			lua_Integer style = luaL_optinteger(L, -1, UI_STYLE_LINENUMBER);
+			lua_pop(L, 1);
+
+			size_t pos = line > 0 ? text_pos_by_lineno(file->text, line) : EPOS;
+			Mark mark = pos == EPOS ? EMARK : text_mark_set(file->text, pos);
+			if (mark) {
+				Sign *sign = da_push(vis, &file->signs);
+				sign->pos       = mark;
+				sign->style     = Clamp(style, 0, UI_STYLE_MAX - 1);
+				sign->glyph_len = MIN(glyph_len, countof(sign->glyph) - 1);
+				memory_copy(sign->glyph, (void *)glyph, sign->glyph_len);
+				sign->glyph[sign->glyph_len] = 0;
+				sign->line = 0;
+			}
+		}
+		lua_pop(L, 1);
+	}
+	return 0;
+}
+
+/***
+ * Remove all gutter signs associated with this file.
+ *
+ * @function sign_clear
+ * @see sign_set
+ */
+static int file_sign_clear(lua_State *L) {
+	File *file = obj_ref_check(L, 1, VIS_LUA_TYPE_FILE);
+	file->signs.count = 0;
+	return 0;
+}
+
 static const struct luaL_Reg file_funcs[] = {
 	{ "__index", file_index },
 	{ "__newindex", file_newindex },
@@ -2896,6 +2966,8 @@ static const struct luaL_Reg file_funcs[] = {
 	{ "content", file_content },
 	{ "mark_set", file_mark_set },
 	{ "mark_get", file_mark_get },
+	{ "sign_set", file_sign_set },
+	{ "sign_clear", file_sign_clear },
 	{ "offset_from_line_column", file_offset_from_line_column },
 	{ "line_column_from_offset", file_line_column_from_offset },
 	{ NULL, NULL },
