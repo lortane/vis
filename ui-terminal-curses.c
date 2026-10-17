@@ -221,10 +221,30 @@ static void ui_term_backend_blit(Ui *tui) {
 	wnoutrefresh(stdscr);
 	if (tui->doupdate)
 		doupdate();
+	/* When the terminal draws the primary cursor, re-assert its visibility
+	 * after every update: `?25h` is idempotent and does not reset blinking
+	 * (unlike DECSCUSR), so it recovers from programs that hide the cursor
+	 * (e.g. a `:!`/fzf subprocess) that ncurses does not know about. */
+	if (tui->cursor_terminal) {
+		str8 show = str8("\x1b[?25h");
+		os_write_file(os_error_handle(), show.data, show.length);
+	}
 }
 
 static void ui_term_backend_clear(Ui *tui) {
 	clear();
+}
+
+/* Let the terminal draw the primary cursor (vis.c skips painting it) with the
+ * requested DECSCUSR shape. ncurses has no API for the shape, so emit it raw
+ * (like undo_palette does for the palette). */
+static void ui_term_backend_cursor(Ui *tui) {
+	if (!tui->cursor_terminal) {
+		curs_set(0);
+		return;
+	}
+	curs_set(1);
+	vis_ui_cursor_shape_output(tui->cursor_shape);
 }
 
 static bool ui_term_backend_resize(Ui *tui, int width, int height) {
@@ -278,13 +298,18 @@ ui_backend_init(Ui *ui, char *term)
 	return result;
 }
 
-VIS_INTERNAL void ui_terminal_resume(Ui *term) {}
+VIS_INTERNAL void ui_terminal_resume(Ui *tui) {
+	ui_term_backend_cursor(tui);
+}
 
 VIS_INTERNAL void
 ui_term_backend_suspend(Ui *ui)
 {
 	if (ui->curses.change_colors == 1)
 		undo_palette();
+	/* restore the terminal's default cursor shape on suspend/exit */
+	if (ui->cursor_terminal)
+		vis_ui_cursor_shape_output(VIS_CURSOR_SHAPE_DEFAULT);
 	curs_set(1);
 }
 

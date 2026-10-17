@@ -250,6 +250,15 @@ ui_term_backend_blit(Ui *ui)
 	// NOTE(rnp): maintain cursor position in case it gets queried through escape codes
 	vis_buffer_appendf(buf, "\x1b[%d;%dH", ui->cur_row + 1, ui->cur_col + 1);
 
+	// NOTE: when the terminal draws the primary cursor, re-assert its
+	// visibility on every frame. `?25h` is idempotent and does not reset
+	// blinking (unlike DECSCUSR), so it recovers from programs that hide the
+	// cursor (e.g. a `:!`/fzf subprocess) without needing a resume event.
+	if (ui->cursor_terminal) {
+		str8 show = str8("\x1b[?25h");
+		buffer_append(buf, show.data, show.length);
+	}
+
 	///////////////////////
 	// NOTE(rnp): blit
 	vis_ui_vt100_output((str8){.data = (u8 *)buf->data, .length = buf->length});
@@ -257,6 +266,19 @@ ui_term_backend_blit(Ui *ui)
 
 VIS_INTERNAL void ui_term_backend_clear(Ui *ui) {}
 VIS_INTERNAL void ui_term_backend_save(Ui *ui, bool fscr) {}
+
+/* Apply the current cursor visibility/shape to the terminal. Called whenever
+ * the user requests the terminal cursor (vis_ui_cursor_set) and after resume. */
+VIS_INTERNAL void
+ui_term_backend_cursor(Ui *ui)
+{
+	if (!ui->cursor_terminal) {
+		vis_ui_vt100_cursor_visible(false);
+		return;
+	}
+	vis_ui_vt100_cursor_visible(true);
+	vis_ui_cursor_shape_output(ui->cursor_shape);
+}
 
 VIS_INTERNAL void
 ui_term_backend_restore(Ui *ui)
@@ -282,6 +304,9 @@ ui_term_backend_suspend(Ui *tui)
 {
 	termkey_stop(&tui->termkey);
 	vis_ui_vt100_cursor_visible(true);
+	/* restore the terminal's default cursor shape on suspend/exit */
+	if (tui->cursor_terminal)
+		vis_ui_cursor_shape_output(VIS_CURSOR_SHAPE_DEFAULT);
 	vis_ui_vt100_altscreen(false);
 }
 
@@ -289,7 +314,7 @@ VIS_INTERNAL void
 ui_terminal_resume(Ui *tui)
 {
 	vis_ui_vt100_altscreen(true);
-	vis_ui_vt100_cursor_visible(false);
+	ui_term_backend_cursor(tui);
 	termkey_start(&tui->termkey, UI_TERMKEY_FLAGS);
 }
 

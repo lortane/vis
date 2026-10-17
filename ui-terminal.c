@@ -88,11 +88,35 @@ vis_cell_from_string(str8 *text)
 	return result;
 }
 
+/* Request a cursor shape from the terminal using DECSCUSR (CSI Ps SP q).
+ * Terminals that do not support it will simply ignore the sequence. */
+VIS_INTERNAL void
+vis_ui_cursor_shape_output(u8 shape)
+{
+	static const char *const sequences[] = {
+		"\x1b[0 q", "\x1b[1 q", "\x1b[2 q", "\x1b[3 q",
+		"\x1b[4 q", "\x1b[5 q", "\x1b[6 q",
+	};
+	if (shape >= countof(sequences))
+		shape = VIS_CURSOR_SHAPE_DEFAULT;
+	str8 s = {.data = (u8 *)sequences[shape], .length = 5};
+	os_write_file(os_error_handle(), s.data, s.length);
+}
+
 #if CONFIG_CURSES
 #include "ui-terminal-curses.c"
 #else
 #include "ui-terminal-vt100.c"
 #endif
+
+VIS_INTERNAL void
+vis_ui_cursor_set(Vis *vis, bool terminal, u8 shape)
+{
+	Ui *ui = &vis->ui;
+	ui->cursor_terminal = terminal;
+	ui->cursor_shape = (shape <= VIS_CURSOR_SHAPE_BAR) ? shape : VIS_CURSOR_SHAPE_DEFAULT;
+	ui_term_backend_cursor(ui);
+}
 
 void ui_die(Ui *tui, const char *msg, va_list ap) {
 	ui_terminal_free(tui);

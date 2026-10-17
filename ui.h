@@ -60,6 +60,18 @@ typedef enum {
 	VisCellAttribute_Dim       = 1u << 5,
 } VisCellAttribute;
 
+/* Cursor shape as requested from the terminal using DECSCUSR (CSI Ps SP q).
+ * The values are the DECSCUSR Ps parameter. */
+typedef enum {
+	VIS_CURSOR_SHAPE_DEFAULT            = 0,
+	VIS_CURSOR_SHAPE_BLINKING_BLOCK     = 1,
+	VIS_CURSOR_SHAPE_BLOCK              = 2,
+	VIS_CURSOR_SHAPE_BLINKING_UNDERLINE = 3,
+	VIS_CURSOR_SHAPE_UNDERLINE          = 4,
+	VIS_CURSOR_SHAPE_BLINKING_BAR       = 5,
+	VIS_CURSOR_SHAPE_BAR                = 6,
+} VisCursorShape;
+
 typedef enum {
 	VisCellProperty_None          = 0,
 	VisCellProperty_FGSet         = 1u << 0, // user provided FG (if not keep cell's existing FG)
@@ -142,6 +154,12 @@ typedef struct {
 	int width, height;         /* terminal dimensions available for all windows */
 	int cur_row, cur_col;      /* active cursor's (0-based) position on the terminal */
 	enum UiLayout layout;      /* whether windows are displayed horizontally or vertically */
+
+	/* When set, the primary cursor is drawn by the terminal instead of by
+	 * vis (see vis_ui_cursor_set). cursor_shape is a VisCursorShape. */
+	bool cursor_terminal;
+	u8   cursor_shape;
+
 	// TODO(rnp): cleanup usage of this
 	bool doupdate;             /* Whether to update the screen after refreshing contents */
 
@@ -188,6 +206,10 @@ VIS_INTERNAL bool vis_ui_getkey(Vis *, TermKeyKey *);
 VIS_INTERNAL u16  vis_ui_style_push(Vis *);
 VIS_INTERNAL bool vis_ui_style_define(Vis *, u16 style_id, str8 style);
 VIS_INTERNAL bool vis_ui_window_style_set_pos(Win *win, int x, int y, u16 style_id);
+
+/* Select whether the primary cursor is drawn by the terminal (`terminal` true,
+ * with `shape` a VisCursorShape requested via DECSCUSR) or by vis itself. */
+VIS_INTERNAL void vis_ui_cursor_set(Vis *, bool terminal, u8 shape);
 
 VIS_INTERNAL void ui_window_options_set(Win *win, enum UiOption options);
 VIS_INTERNAL void ui_window_status(Vis *vis, Win *win, const char *status);

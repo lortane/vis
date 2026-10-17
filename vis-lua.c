@@ -1830,10 +1830,63 @@ vis_lua_ui_style_define(lua_State *L)
 	return 1;
 }
 
+/***
+ * Let the terminal draw the primary cursor instead of vis.
+ *
+ * By default vis paints the primary cursor itself (the `CURSOR_PRIMARY`
+ * style) and keeps the terminal cursor hidden. Calling this with a shape name
+ * makes the terminal draw it instead: its colour then follows the terminal
+ * configuration and the shape is requested with the standard DECSCUSR
+ * sequence (`CSI Ps SP q`), which terminals and multiplexers such as zellij
+ * forward. Pass `false`/`nil` to go back to vis' own cursor.
+ *
+ * @function cursor
+ * @tparam[opt] string shape one of `"default"`, `"block"`,
+ *  `"blinking_block"`, `"underline"`, `"blinking_underline"`, `"bar"`,
+ *  `"blinking_bar"`, or `false`/`nil` to use vis' own cursor
+ * @treturn bool whether the terminal cursor is now in use
+ * @usage
+ * vis.ui:cursor("bar")
+ */
+VIS_INTERNAL int
+vis_lua_ui_cursor(lua_State *L)
+{
+	static const struct {
+		const char *name;
+		u8          shape;
+	} shapes[] = {
+		{ "default",            VIS_CURSOR_SHAPE_DEFAULT            },
+		{ "blinking_block",     VIS_CURSOR_SHAPE_BLINKING_BLOCK     },
+		{ "block",              VIS_CURSOR_SHAPE_BLOCK              },
+		{ "blinking_underline", VIS_CURSOR_SHAPE_BLINKING_UNDERLINE },
+		{ "underline",          VIS_CURSOR_SHAPE_UNDERLINE          },
+		{ "blinking_bar",       VIS_CURSOR_SHAPE_BLINKING_BAR       },
+		{ "bar",                VIS_CURSOR_SHAPE_BAR                },
+	};
+
+	Vis *vis = lua_touserdata(L, lua_upvalueindex(1));
+	if (lua_isnoneornil(L, 2) || (lua_isboolean(L, 2) && !lua_toboolean(L, 2))) {
+		vis_ui_cursor_set(vis, false, VIS_CURSOR_SHAPE_DEFAULT);
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	const char *name = luaL_checkstring(L, 2);
+	for (size_t i = 0; i < countof(shapes); i++) {
+		if (strcmp(name, shapes[i].name) == 0) {
+			vis_ui_cursor_set(vis, true, shapes[i].shape);
+			lua_pushboolean(L, true);
+			return 1;
+		}
+	}
+	return luaL_argerror(L, 2, "unknown cursor shape");
+}
+
 
 static const struct luaL_Reg vis_lua_ui_funcs[] = {
 	{"__index",      vis_lua_ui_index       },
 	{"__newindex",   vis_lua_ui_newindex    },
+	{"cursor",       vis_lua_ui_cursor      },
 	{"style_define", vis_lua_ui_style_define},
 	{"style_push",   vis_lua_ui_style_push  },
 	{0},

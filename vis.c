@@ -265,11 +265,15 @@ static void window_draw_cursor(Win *win, Selection *cur) {
 	if (win->vis->win != win)
 		return;
 	if (cur->line) {
-		s32 line_index = vis_view_line_index(&win->view, cur->line);
 		Selection *primary = view_selections_primary_get(&win->view);
-		u16 style_id = primary == cur ? UI_STYLE_CURSOR_PRIMARY : UI_STYLE_CURSOR;
-		VisCellStyle *style = win->view.cell_styles + line_index * win->view.width + cur->col;
-		*style = vis_cell_style_merge(*style, win->vis->ui.styles[style_id]);
+		bool is_primary = primary == cur;
+		/* when the terminal draws the primary cursor, do not paint a block over it */
+		if (!(is_primary && win->vis->ui.cursor_terminal)) {
+			s32 line_index = vis_view_line_index(&win->view, cur->line);
+			u16 style_id = is_primary ? UI_STYLE_CURSOR_PRIMARY : UI_STYLE_CURSOR;
+			VisCellStyle *style = win->view.cell_styles + line_index * win->view.width + cur->col;
+			*style = vis_cell_style_merge(*style, win->vis->ui.styles[style_id]);
+		}
 		window_draw_cursor_matching(win, cur);
 	}
 }
@@ -284,7 +288,13 @@ static void window_draw_selections(Win *win) {
 			break;
 		window_draw_cursor(win, s);
 	}
-	window_draw_selection(win, sel);
+	/* A singleton selection is a cursor, not a range, even though
+	 * view_selections_get() reports it as a one character range. When the
+	 * terminal draws the primary cursor, that character must stay unstyled
+	 * (otherwise the selection highlight, normally masked by the cursor
+	 * block, becomes visible under the terminal cursor). */
+	if (!(win->vis->ui.cursor_terminal && !sel->anchored))
+		window_draw_selection(win, sel);
 	window_draw_cursor(win, sel);
 	for (Selection *s = view_selections_next(sel); s; s = view_selections_next(s)) {
 		window_draw_selection(win, s);
