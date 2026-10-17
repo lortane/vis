@@ -3556,6 +3556,7 @@ static void vis_lua_init(Vis *vis)
 				{UI_STYLE_STATUS_FOCUSED,    "STATUS_FOCUSED"   },
 				{UI_STYLE_SEPARATOR,         "SEPARATOR"        },
 				{UI_STYLE_INFO,              "INFO"             },
+				{UI_STYLE_PROMPT,            "PROMPT"           },
 				{UI_STYLE_EOF,               "EOF"              },
 				{UI_STYLE_WHITESPACE,        "WHITESPACE"       },
 			};

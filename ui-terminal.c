@@ -411,9 +411,16 @@ static void ui_window_draw(Win *win) {
 		sidebar_width = MIN(win->width, MAX(sidebar_width, win->min_sidebar_width));
 	}
 	int sidebar_offset = sign_width + sidebar_width;
-	if (sidebar_offset != win->sidebar_width) {
-		vis_view_resize(view, width - sidebar_offset, status ? height - 1 : height);
+	/* The oneline windows (prompt/message) are placed just above the bottom
+	 * status bar, so the bottom-most window must reclaim those rows from its
+	 * text view (otherwise the status bar could not stay put). */
+	int view_height = status ? height - 1 : height;
+	if (ui->oneline_count && !(win->options & UI_OPTION_ONELINE) &&
+	    win->y + win->height == ui->height - (ui->info_length ? 1 : 0))
+		view_height -= ui->oneline_count;
+	if (sidebar_offset != win->sidebar_width || view_height != view->height) {
 		win->sidebar_width = sidebar_offset;
+		vis_view_resize(view, width - sidebar_offset, MAX(view_height, 1));
 	}
 	vis_window_draw(win);
 
@@ -499,13 +506,18 @@ ui_arrange(Vis *vis, enum UiLayout layout)
 {
 	Ui *tui = &vis->ui;
 	tui->layout = layout;
-	int n = 0, m = tui->info_length != 0, x = 0, y = 0;
+	int n = 0, m = tui->info_length != 0, oneline = 0, x = 0, y = 0;
 	for (Win *win = vis->windows; win; win = win->next) {
 		if (win->options & UI_OPTION_ONELINE)
-			m++;
+			oneline++;
 		else
 			n++;
 	}
+	tui->oneline_count = oneline;
+	/* NOTE: the oneline windows are placed just above the bottom status bar
+	 * (rather than reserving separate rows at the very bottom) so that the
+	 * status bar stays put when the prompt appears. The corresponding rows are
+	 * reclaimed from the text view in ui_window_draw. */
 	int max_height = tui->height - m;
 	int width = (tui->width / MAX(1, n)) - 1;
 	int height = max_height / MAX(1, n);
@@ -541,6 +553,10 @@ ui_arrange(Vis *vis, enum UiLayout layout)
 	if (layout == UI_LAYOUT_VERTICAL)
 		y = max_height;
 
+	/* oneline windows go on the rows directly above the bottom status bar */
+	y = max_height - 1 - oneline;
+	if (y < 0)
+		y = 0;
 	for (Win *win = vis->windows; win; win = win->next) {
 		if (!(win->options & UI_OPTION_ONELINE))
 			continue;

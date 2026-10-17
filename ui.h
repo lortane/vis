@@ -43,6 +43,7 @@ typedef enum {
 	UI_STYLE_STATUS_FOCUSED,
 	UI_STYLE_SEPARATOR,
 	UI_STYLE_INFO,
+	UI_STYLE_PROMPT,
 	UI_STYLE_EOF,
 	UI_STYLE_WHITESPACE,
 	UI_STYLE_LAST = UI_STYLE_WHITESPACE,
@@ -159,6 +160,10 @@ typedef struct {
 	 * vis (see vis_ui_cursor_set). cursor_shape is a VisCursorShape. */
 	bool cursor_terminal;
 	u8   cursor_shape;
+
+	/* number of UI_OPTION_ONELINE windows (prompt/message), placed just
+	 * above the bottom status bar so the latter does not move. */
+	int oneline_count;
 
 	// TODO(rnp): cleanup usage of this
 	bool doupdate;             /* Whether to update the screen after refreshing contents */

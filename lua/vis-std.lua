@@ -45,6 +45,7 @@ vis:option_register("theme", "string", function(name)
 	ui:style_define(ui.style_ids.STATUS_FOCUSED,    lexers.STYLE_STATUS_FOCUSED    or '')
 	ui:style_define(ui.style_ids.SEPARATOR,         lexers.STYLE_SEPARATOR         or '')
 	ui:style_define(ui.style_ids.INFO,              lexers.STYLE_INFO              or '')
+	ui:style_define(ui.style_ids.PROMPT,            lexers.STYLE_PROMPT            or '')
 	ui:style_define(ui.style_ids.EOF,               lexers.STYLE_EOF               or '')
 	ui:style_define(ui.style_ids.WHITESPACE,        lexers.STYLE_WHITESPACE        or '')
 

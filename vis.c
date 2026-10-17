@@ -216,6 +216,15 @@ static void window_draw_cursorline(Win *win) {
 	}
 }
 
+/* Fill the (one line) prompt window with UI_STYLE_PROMPT so the command/search
+ * line stands out from the buffer background. */
+static void window_draw_prompt(Win *win) {
+	View *view = &win->view;
+	VisCellStyle style = win->vis->ui.styles[UI_STYLE_PROMPT];
+	for (s32 i = 0; i < view->width * view->height; i++)
+		view->cell_styles[i] = vis_cell_style_merge(view->cell_styles[i], style);
+}
+
 static void window_draw_selection(Win *win, Selection *cur) {
 	View *view = &win->view;
 	Filerange sel = view_selections_get(cur);
@@ -327,6 +336,8 @@ void vis_window_draw(Win *win) {
 
 	window_draw_colorcolumn(win);
 	window_draw_cursorline(win);
+	if (win->options & UI_OPTION_ONELINE)
+		window_draw_prompt(win);
 	if (!vis->win || vis->win == win || vis->win->parent == win)
 		window_draw_selections(win);
 	window_draw_eof(win);
